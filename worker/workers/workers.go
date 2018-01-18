@@ -56,12 +56,13 @@ func (w *Worker)WriterInfosBeat()  {
 
 	//注册服务信息
 	svInfo := registryServiceInfos(w)
-
+	time.Sleep(time.Second * 10)
 	//更新服务信息
 	updateServiceInfos(w,svInfo)
-
+	time.Sleep(time.Second * 10)
 	//删除服务信息
 	deleteServiceInfos(w,svInfo)
+	time.Sleep(time.Second * 10)
 }
 //注册服务信息
 func registryServiceInfos(w *Worker) *ServiceInfo{
