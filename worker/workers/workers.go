@@ -4,10 +4,8 @@ import (
 	etcd "github.com/coreos/etcd/client"
 	"time"
 	"log"
-	"strconv"
 	"encoding/json"
 	"context"
-	"fmt"
 	"runtime"
 	"os"
 )
