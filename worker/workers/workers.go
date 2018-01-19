@@ -51,18 +51,21 @@ func InitWorker(name string,endpoints []string)  *Worker{
 	return worker
 }
 
-//向etcd写入信息
+//向etcd注册信息，更新服务信息，删除服务信息
 func (w *Worker)WriterInfosBeat()  {
 
-	//注册服务信息
-	svInfo := registryServiceInfos(w)
-	time.Sleep(time.Second * 10)
-	//更新服务信息
-	updateServiceInfos(w,svInfo)
-	time.Sleep(time.Second * 10)
-	//删除服务信息
-	deleteServiceInfos(w,svInfo)
-	time.Sleep(time.Second * 10)
+	//持续向etcd注册和更新删除自己的服务信息
+	for  {
+		//注册服务信息
+		svInfo := registryServiceInfos(w)
+		time.Sleep(time.Second * 10)
+		//更新服务信息
+		updateServiceInfos(w,svInfo)
+		time.Sleep(time.Second * 10)
+		//删除服务信息
+		deleteServiceInfos(w,svInfo)
+		time.Sleep(time.Second * 30)
+	}
 }
 //注册服务信息
 func registryServiceInfos(w *Worker) *ServiceInfo{
