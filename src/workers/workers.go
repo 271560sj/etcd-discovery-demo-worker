@@ -27,9 +27,9 @@ type Worker struct {
 }
 //设置记录消息的结构体
 type WorkInfo struct {
-	IP string
-	Port string
-	Name string
+	IP string `json:"ip"`
+	Port string `json:"port"`
+	Name string `json:"name"`
 }
 
 //初始化worker service连接etcd
