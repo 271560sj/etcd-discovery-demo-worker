@@ -7,7 +7,16 @@ import (
 	"strconv"
 	"encoding/json"
 	"context"
-	"fmt"
+)
+
+const (
+	//记录关键字
+	workerKey = "workerService"
+	watcherKey = "masterService"
+	ip = "192.168.133.132"
+	port = "2365"
+	name = "worker"
+
 )
 
 //设置worker service的结构体
@@ -18,9 +27,9 @@ type Worker struct {
 }
 //设置记录消息的结构体
 type WorkInfo struct {
-	IDs string
-	KeyWord string
-	Infos string
+	IP string
+	Port string
+	Name string
 }
 
 //初始化worker service连接etcd
@@ -47,28 +56,22 @@ func InitWorker(name,ip string,endpoints []string)  *Worker{
 		KeysAPI: etcd.NewKeysAPI(client),
 	}
 
+	go worker.WorkerService()
+
 	return worker
 }
 
 //向etcd写入信息
-func (w *Worker)WriterInfosBeat()  {
+func (w *Worker)WorkerService()  {
 	//获取操作key的API
 	keysApi := w.KeysAPI
 	i := 1
 	for  {//循环写入key的信息
-		fmt.Printf("Send book infos of %d \n",i)
 		//创建key,并写入value值
-		sendBookInfos(i,keysApi)
-		if i % 2 == 0 {
-			fmt.Printf("Change book infos of %d \n",i)
-			//修改key的value值
-			changeBookInfos(i,keysApi)
-		}
-		if i % 3 ==0 {
-			fmt.Printf("Delete book infos of %d \n",i)
-			//删除key
-			deleteBookInfos(i,keysApi)
-		}
+		go sendWorkerInfos(i,keysApi)
+		go changeWorkerService(i,keysApi)
+		go deleteWorkerService(keysApi)
+		go watcherMasterService(keysApi)
 		i ++
 		if i > 30 {
 			break
@@ -77,51 +80,72 @@ func (w *Worker)WriterInfosBeat()  {
 	}
 }
 //创建key,并写入value值
-func sendBookInfos(i int,keysApi etcd.KeysAPI)  {
-	ids := "books" + strconv.Itoa(i)
-	keyWords := "book"
-	infos := "it is a book about num of " + strconv.Itoa(i)
-	i ++
+func sendWorkerInfos(i int,keysApi etcd.KeysAPI)  {
+	//获取worker 编号
+	ids := strconv.Itoa(i)
+	//设置work service的关键关键字
 	wkInfos := &WorkInfo{
-		IDs: ids,
-		KeyWord: keyWords,
-		Infos: infos,
+		IP: ip,
+		Port: port,
+		Name: name + ids,
 	}
-	key := "books/" + ids
 	value,_ := json.Marshal(wkInfos)
-	_,err := keysApi.Set(context.Background(),key,string(value),&etcd.SetOptions{
-		TTL: time.Second * 10,
+	response,err := keysApi.Set(context.Background(),workerKey,string(value),&etcd.SetOptions{
 	})
 	if err != nil {
-		log.Println("Error send book infos",err)
+		log.Println("Error send worker service infos",err)
+	}else {
+		dealWithData(response)
 	}
-	log.Println("Send book infos success,",string(value))
 }
 //删除key
-func deleteBookInfos(i int,keysApi etcd.KeysAPI)  {
-	ids := "books" + strconv.Itoa(i)
-	keys := "books/" + ids
-	value,err := keysApi.Delete(context.Background(),keys,nil)
+func deleteWorkerService(keysApi etcd.KeysAPI)  {
+	value,err := keysApi.Delete(context.Background(),workerKey,nil)
 	if err != nil {
 		log.Println("Error delete keys,",err)
 	}else {
-		log.Println("Deletes keys success",value)
+		dealWithData(value)
 	}
 }
 //修改key的value值
-func changeBookInfos(i int, keysApi etcd.KeysAPI )  {
-	ids := "books" + strconv.Itoa(i)
-	keys := "books/" + ids
+func changeWorkerService(i int, keysApi etcd.KeysAPI )  {
+	ids := strconv.Itoa(i)
 	wkInfos := &WorkInfo{
-		IDs: ids,
-		KeyWord: "book",
-		Infos: "update the book's infos",
+		IP: ip,
+		Port: port + ",changed",
+		Name: name + ids,
 	}
 	values,_ := json.Marshal(wkInfos)
-	value,err := keysApi.Set(context.Background(),keys,string(values),nil)
+	value,err := keysApi.Set(context.Background(),workerKey,string(values),nil)
 	if err != nil {
-		log.Println("Error update book's infos",err)
+		log.Println("Error update worker service infos",err)
 	}else {
-		log.Println("Success update book's infos",value)
+		dealWithData(value)
+	}
+}
+
+//处理获取的数据
+func dealWithData(nodes *etcd.Response)  {
+	node := nodes.Node
+	key := node.Key
+	value := node.Value
+	ttl := strconv.FormatInt(node.TTL,10)
+	log.Print(nodes.Action + "," + key + "," + value + "," + ttl)
+}
+
+//监控Master的注册信息
+func watcherMasterService(keysApi etcd.KeysAPI)  {
+	keyApi := keysApi
+	watcher := keyApi.Watcher(watcherKey,&etcd.WatcherOptions{
+		Recursive:true,
+	})
+
+	for{
+		nodes, err := watcher.Next(context.Background())
+		if err != nil {
+			 log.Println("Watcher master service error")
+			 continue
+		}
+		dealWithData(nodes)
 	}
 }
